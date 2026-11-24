@@ -392,16 +392,28 @@ const InvoiceRegister = () => {
     try {
       setSubmitting(true);
       const validItems = items.filter(i => (i.material?._id || i.material) !== '');
-      const formattedItems = validItems.map(item => ({
-        material: item.material?._id || item.material,
-        color: item.color?._id || item.color || null,
-        size: item.size?._id || item.size || null,
-        uom: item.uom || 'Pcs',
-        issuedQty: Number(item.issuedQty || 0),
-        unitPrice: Number(item.unitPrice || 0),
-        totalPrice: Number(item.totalPrice || 0),
-        storeLocation: item.storeLocation || form.globalWarehouse
-      }));
+      const formattedItems = validItems.map(item => {
+        // Save the readable names with the line, so the list and print always show them
+        const matched = searchableItems.find(m => String(m._id) === getId(item.material));
+        const colorObj = colors.find(c => String(c._id) === getId(item.color));
+        const sizeObj = matched?.sizes?.find(s => String(s._id) === getId(item.size));
+        return {
+          material: item.material?._id || item.material,
+          color: item.color?._id || item.color || null,
+          size: item.size?._id || item.size || null,
+          uom: item.uom || 'Pcs',
+          issuedQty: Number(item.issuedQty || 0),
+          unitPrice: Number(item.unitPrice || 0),
+          totalPrice: Number(item.totalPrice || 0),
+          storeLocation: item.storeLocation || form.globalWarehouse,
+          // The material id points to Material or FinishedGood, so the model type must be sent too
+          itemModel: item.itemModel || (matched?.itemType === 'Raw Material' ? 'Material' : 'FinishedGood'),
+          resolvedName: item.resolvedName || matched?.itemName || '',
+          resolvedCode: item.resolvedCode || matched?.itemCode || '',
+          colorName: colorObj ? (colorObj.colorName || colorObj.name || '') : (item.colorName || ''),
+          sizeName: sizeObj ? (sizeObj.sizeCode || sizeObj.name || '') : (item.sizeName || '')
+        };
+      });
 
       await axios.post(`${API_URL}/invoices/save`, {
         invoiceId,
@@ -1031,14 +1043,14 @@ const InvoiceRegister = () => {
               <tbody className="divide-y divide-slate-100/60">
                 {items.map((row, i) => {
                   const matchedSearchItem = searchableItems.find(m => String(m._id) === getId(row.material));
-                  const displayItemName = row.resolvedName || matchedSearchItem?.itemName || 'Item';
+                  const displayItemName = row.resolvedName || row.itemName || matchedSearchItem?.itemName || 'Item';
                   const displayItemCode = row.resolvedCode || matchedSearchItem?.itemCode || '';
 
                   const linkedColor = colors.find(c => String(c._id) === getId(row.color));
-                  const displayColor = linkedColor ? (linkedColor.colorName || linkedColor.name) : 'Default';
+                  const displayColor = row.colorName || (linkedColor ? (linkedColor.colorName || linkedColor.name) : '') || 'Default';
 
                   const linkedSizeObj = matchedSearchItem?.sizes?.find(s => String(s._id) === getId(row.size));
-                  const displaySize = linkedSizeObj ? (linkedSizeObj.sizeCode || linkedSizeObj.name) : (row.size?.sizeCode || 'Default');
+                  const displaySize = row.sizeName || (linkedSizeObj ? (linkedSizeObj.sizeCode || linkedSizeObj.name) : '') || row.size?.sizeCode || 'Default';
 
                   const printUom = resolveUomString(row.uom, matchedSearchItem);
 
