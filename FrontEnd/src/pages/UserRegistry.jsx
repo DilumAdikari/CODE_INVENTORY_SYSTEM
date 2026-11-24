@@ -62,7 +62,7 @@ const UserRegistry = () => {
     e.preventDefault();
     if (!regUsername || !regPassword) return alert("Please fill all fields.");
     try {
-      await axios.post('${API_URL}/auth/register', {
+      await axios.post(`${API_URL}/auth/register`, {
         username: regUsername,
         password: regPassword
       });
