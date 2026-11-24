@@ -1,3 +1,11 @@
+# Secrets (passwords, API keys)
+.env
+.env.*
+!.env.example
+
+# Machine-specific frontend config
+frontend/src/api/config.js
+
 # Logs
 logs
 *.log
@@ -7,6 +15,7 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
+# Dependencies and build output
 node_modules
 dist
 dist-ssr
