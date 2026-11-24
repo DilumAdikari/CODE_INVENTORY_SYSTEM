@@ -36,14 +36,14 @@ const getApproverFromWorkflow = async (workflowId) => {
 router.get('/', async (req, res) => {
   try {
     const invoices = await Invoice.find()
-      .populate({ 
-        path: 'items.material', 
-        select: 'materialName materialCode itemName itemCode uom', 
+      .populate({
+        path: 'items.material',
+        select: 'materialName materialCode itemName itemCode uom',
         populate: { path: 'uom', select: 'name abbreviation' },
-        options: { strictPopulate: false } 
+        options: { strictPopulate: false }
       })
       .populate({ path: 'items.color', select: 'colorName colorCode name nameS code', options: { strictPopulate: false } })
-      .populate({ path: 'items.size', select: 'sizeCode sizeDescription name', options: { strictPopulate: false } }) 
+      .populate({ path: 'items.size', select: 'sizeCode sizeDescription name', options: { strictPopulate: false } })
       .populate({ path: 'items.storeLocation', select: 'warehouseName warehouseCode', options: { strictPopulate: false } })
       .populate({ path: 'workflow', select: 'code name', options: { strictPopulate: false } })
       .sort({ createdAt: -1 });
@@ -55,9 +55,10 @@ router.get('/', async (req, res) => {
           let resolvedUom = 'Pcs';
 
           if (it.material && typeof it.material === 'object') {
-            it.resolvedName = it.material.itemName || it.material.materialName || 'Item';
-            it.resolvedCode = it.material.itemCode || it.material.materialCode || '';
-            
+            // Saved names win; the populated record is only a fallback for old lines
+            it.resolvedName = it.resolvedName || it.material.itemName || it.material.materialName || 'Item';
+            it.resolvedCode = it.resolvedCode || it.material.itemCode || it.material.materialCode || '';
+
             // Material හෝ FinishedGood එකේ populate වූ uom එකෙන් abbreviation ලබා ගැනීම
             if (it.material.uom) {
               if (typeof it.material.uom === 'object' && it.material.uom.abbreviation) {
@@ -68,11 +69,14 @@ router.get('/', async (req, res) => {
               }
             }
           } else if (it.material && mongoose.Types.ObjectId.isValid(it.material)) {
-            let foundItem = await FinishedGood.findById(it.material).populate('uom').lean();
-            if (!foundItem) foundItem = await Material.findById(it.material).populate('uom').lean();
+            // Look in the model the line says it belongs to first
+            const primary = it.itemModel === 'Material' ? Material : FinishedGood;
+            const secondary = it.itemModel === 'Material' ? FinishedGood : Material;
+            let foundItem = await primary.findById(it.material).populate('uom').lean();
+            if (!foundItem) foundItem = await secondary.findById(it.material).populate('uom').lean();
             if (foundItem) {
-              it.resolvedName = foundItem.itemName || foundItem.materialName || 'Item';
-              it.resolvedCode = foundItem.itemCode || foundItem.materialCode || '';
+              it.resolvedName = it.resolvedName || foundItem.itemName || foundItem.materialName || 'Item';
+              it.resolvedCode = it.resolvedCode || foundItem.itemCode || foundItem.materialCode || '';
               if (foundItem.uom) {
                 if (typeof foundItem.uom === 'object' && foundItem.uom.abbreviation) {
                   resolvedUom = foundItem.uom.abbreviation;
@@ -125,7 +129,7 @@ router.post('/submit-approval/:id', async (req, res) => {
           const stockCheck = await Stock.findOne({
             material: item.material,
             color: item.color || null,
-            size: item.size || null, 
+            size: item.size || null,
             warehouse: item.storeLocation
           });
 
@@ -203,10 +207,17 @@ router.post('/save', async (req, res) => {
       return {
         material: mongoose.Types.ObjectId.isValid(item.material?._id || item.material)
           ? new mongoose.Types.ObjectId(item.material?._id || item.material) : null,
+        // Tells populate whether the material id is a Material or a FinishedGood
+        itemModel: item.itemModel === 'Material' ? 'Material' : 'FinishedGood',
+        // Readable names are saved with the line so list and print never show "Item"
+        resolvedName: String(item.resolvedName || ''),
+        resolvedCode: String(item.resolvedCode || ''),
+        colorName: String(item.colorName || ''),
+        sizeName: String(item.sizeName || ''),
         color: mongoose.Types.ObjectId.isValid(item.color?._id || item.color)
           ? new mongoose.Types.ObjectId(item.color?._id || item.color) : null,
         size: mongoose.Types.ObjectId.isValid(item.size?._id || item.size)
-          ? new mongoose.Types.ObjectId(item.size?._id || item.size) : null, 
+          ? new mongoose.Types.ObjectId(item.size?._id || item.size) : null,
         storeLocation: mongoose.Types.ObjectId.isValid(item.storeLocation?._id || item.storeLocation)
           ? new mongoose.Types.ObjectId(item.storeLocation?._id || item.storeLocation)
           : targetGlobalWarehouse,
@@ -223,7 +234,7 @@ router.post('/save', async (req, res) => {
           const stockCheck = await Stock.findOne({
             material: item.material,
             color: item.color || null,
-            size: item.size || null, 
+            size: item.size || null,
             warehouse: item.storeLocation
           });
 

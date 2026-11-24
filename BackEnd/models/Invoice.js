@@ -12,8 +12,13 @@ const invoiceItemSchema = new mongoose.Schema({
     enum: ['Material', 'FinishedGood'],
     default: 'FinishedGood'
   },
+  // Readable names saved with the line, so list and print views do not depend on a lookup
+  resolvedName: { type: String, default: '' },
+  resolvedCode: { type: String, default: '' },
+  colorName: { type: String, default: '' },
+  sizeName: { type: String, default: '' },
+
   color: { type: mongoose.Schema.Types.ObjectId, ref: 'Color', required: false },
-  // 🌟 ✅ FIXED: Size එක ඉන්වොයිස් අයිතමයට එකතු කළා
   size: { type: mongoose.Schema.Types.ObjectId, ref: 'Size', default: null },
   storeLocation: { type: mongoose.Schema.Types.ObjectId, ref: 'Warehouse', required: false },
   uom: { type: String, default: 'Pcs' },
